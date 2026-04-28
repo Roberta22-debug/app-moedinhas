@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Monetário</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+<style>
+body{font-family:Arial;margin:0;background:#eef2f7}
+header{background:#4CAF50;color:white;padding:15px;text-align:center}
+.container{padding:15px}
+.card{background:white;padding:15px;border-radius:15px;margin-top:15px}
+input,select,button{margin:5px;padding:10px;border-radius:10px;border:1px solid #ccc}
+button{background:#4CAF50;color:white;cursor:pointer}
+button:hover{background:#45a049}
+.list-item{display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:8px;background:#f8f8f8;border-radius:8px}
+.acoes button{margin-left:5px}
+</style>
+</head>
+<body>
+
+<header>
+<h2>🏫 Sistema Monetário</h2>
+</header>
+
+<div class="container">
+
+<div class="card">
+<h3>👩‍🏫 Turmas</h3>
+<input id="nomeTurma" placeholder="Nome da turma">
+<button onclick="addTurma()">Adicionar Turma</button>
+<select id="turmaSelect"></select>
+</div>
+
+<div class="card">
+<h3>👤 Alunos</h3>
+<input id="nomeAluno" placeholder="Nome do aluno">
+<input id="saldoAluno" type="number" placeholder="Saldo inicial">
+<button onclick="addAluno()">Adicionar</button>
+<div id="listaAlunos"></div>
+</div>
+
+<div class="card">
+<h3>💸 Registrar Ganho/Perda</h3>
+<select id="alunoAcao"></select>
+<input id="valorAcao" type="number" placeholder="(+ ganho / - perda)">
+<button onclick="registrarAcao()">Registrar</button>
+<div id="listaRegistros"></div>
+</div>
+
+<div class="card">
+<h3>🎁 Recompensas</h3>
+<input id="nomePremio" placeholder="Nome da recompensa">
+<input id="valorPremio" type="number" placeholder="Custo em moedas">
+<button onclick="addPremio()">Adicionar</button>
+<div id="listaPremios"></div>
+</div>
+
+<div class="card">
+<h3>🏆 Ranking</h3>
+<ul id="ranking"></ul>
+</div>
+
+<div class="card">
+<h3>📤 Exportar Dados</h3>
+<button onclick="exportarJSON()">Exportar JSON</button>
+<button onclick="exportarPDF()">Exportar PDF</button>
+</div>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let turmas = [];
+let turmaAtual = 0;
+
+function getTurma(){
+ return turmas[turmaAtual];
+}
+
+function addTurma(){
+ if(!nomeTurma.value) return alert('Digite o nome da turma');
+
+ turmas.push({
+  nome:nomeTurma.value,
+  alunos:[],
+  premios:[],
+  registros:[]
+ });
+
+ nomeTurma.value='';
+ atualizarTurmas();
+ salvar();
+ atualizar();
+}
+
+function atualizarTurmas(){
+ turmaSelect.innerHTML='';
+
+ turmas.forEach((t,i)=>{
+  turmaSelect.innerHTML += `<option value="${i}">${t.nome}</option>`;
+ });
+}
+
+turmaSelect.onchange = ()=>{
+ turmaAtual = turmaSelect.value;
+ atualizar();
+};
+
+function addAluno(){
+ if(!getTurma()) return alert('Crie uma turma primeiro');
+
+ getTurma().alunos.push({
+  nome:nomeAluno.value,
+  saldo:+saldoAluno.value || 0
+ });
+
+ nomeAluno.value='';
+ saldoAluno.value='';
+
+ salvar();
+ atualizar();
+}
+
+function editarAluno(i){
+ let aluno = getTurma().alunos[i];
+
+ let novoNome = prompt('Editar nome:', aluno.nome);
+ let novoSaldo = prompt('Editar saldo:', aluno.saldo);
+
+ if(novoNome !== null) aluno.nome = novoNome;
+ if(novoSaldo !== null) aluno.saldo = +novoSaldo;
+
+ salvar();
+ atualizar();
+}
+
+function excluirAluno(i){
+ if(confirm('Deseja excluir este aluno?')){
+  getTurma().alunos.splice(i,1);
+  salvar();
+  atualizar();
+ }
+}
+
+function registrarAcao(){
+ let alunoIndex = alunoAcao.value;
+ let valor = +valorAcao.value;
+
+ if(isNaN(valor)) return alert('Digite um valor');
+
+ let aluno = getTurma().alunos[alunoIndex];
+ aluno.saldo += valor;
+
+ getTurma().registros.push({
+  aluno: aluno.nome,
+  valor: valor,
+  data: new Date().toLocaleDateString()
+ });
+
+ valorAcao.value='';
+ salvar();
+ atualizar();
+}
+
+function editarRegistro(i){
+ let registro = getTurma().registros[i];
+
+ let novoValor = prompt('Editar valor:', registro.valor);
+
+ if(novoValor !== null){
+  registro.valor = +novoValor;
+ }
+
+ salvar();
+ atualizar();
+}
+
+function excluirRegistro(i){
+ if(confirm('Excluir registro?')){
+  getTurma().registros.splice(i,1);
+  salvar();
+  atualizar();
+ }
+}
+
+function addPremio(){
+ getTurma().premios.push({
+  nome:nomePremio.value,
+  custo:+valorPremio.value
+ });
+
+ nomePremio.value='';
+ valorPremio.value='';
+
+ salvar();
+ atualizar();
+}
+
+function editarPremio(i){
+ let premio = getTurma().premios[i];
+
+ let novoNome = prompt('Editar recompensa:', premio.nome);
+ let novoCusto = prompt('Editar custo:', premio.custo);
+
+ if(novoNome !== null) premio.nome = novoNome;
+ if(novoCusto !== null) premio.custo = +novoCusto;
+
+ salvar();
+ atualizar();
+}
+
+function excluirPremio(i){
+ if(confirm('Excluir recompensa?')){
+  getTurma().premios.splice(i,1);
+  salvar();
+  atualizar();
+ }
+}
+
+function atualizar(){
+ let turma = getTurma();
+ if(!turma) return;
+
+ listaAlunos.innerHTML='';
+ listaPremios.innerHTML='';
+ listaRegistros.innerHTML='';
+ ranking.innerHTML='';
+ alunoAcao.innerHTML='';
+
+ turma.alunos.forEach((a,i)=>{
+  listaAlunos.innerHTML += `
+  <div class='list-item'>
+   <span>${a.nome} - ${a.saldo} moedas</span>
+   <div class='acoes'>
+    <button onclick='editarAluno(${i})'>✏️</button>
+    <button onclick='excluirAluno(${i})'>🗑️</button>
+   </div>
+  </div>`;
+
+  alunoAcao.innerHTML += `<option value='${i}'>${a.nome}</option>`;
+ });
+
+ turma.premios.forEach((p,i)=>{
+  listaPremios.innerHTML += `
+  <div class='list-item'>
+   <span>${p.nome} - ${p.custo} moedas</span>
+   <div class='acoes'>
+    <button onclick='editarPremio(${i})'>✏️</button>
+    <button onclick='excluirPremio(${i})'>🗑️</button>
+   </div>
+  </div>`;
+ });
+
+ turma.registros.forEach((r,i)=>{
+  listaRegistros.innerHTML += `
+  <div class='list-item'>
+   <span>${r.data} - ${r.aluno}: ${r.valor > 0 ? '+' : ''}${r.valor}</span>
+   <div class='acoes'>
+    <button onclick='editarRegistro(${i})'>✏️</button>
+    <button onclick='excluirRegistro(${i})'>🗑️</button>
+   </div>
+  </div>`;
+ });
+
+ [...turma.alunos]
+ .sort((a,b)=>b.saldo-a.saldo)
+ .forEach(a=>{
+  ranking.innerHTML += `<li>${a.nome}: ${a.saldo} moedas</li>`;
+ });
+}
+
+function salvar(){
+ localStorage.setItem('sistemaMonetario', JSON.stringify(turmas));
+}
+
+function carregar(){
+ turmas = JSON.parse(localStorage.getItem('sistemaMonetario')) || [];
+ atualizarTurmas();
+ atualizar();
+}
+
+function exportarJSON(){
+ const data = JSON.stringify(turmas,null,2);
+ const blob = new Blob([data], {type:'application/json'});
+ const url = URL.createObjectURL(blob);
+
+ const a = document.createElement('a');
+ a.href = url;
+ a.download = 'dados_turmas.json';
+ a.click();
+}
+
+function exportarPDF(){
+ let turma = getTurma();
+ if(!turma) return;
+
+ const doc = new jsPDF();
+
+ doc.setFontSize(18);
+ doc.text('Relatório da Turma', 14, 20);
+
+ doc.setFontSize(12);
+ doc.text(`Turma: ${turma.nome}`, 14, 30);
+ doc.text(`Data: ${new Date().toLocaleDateString()}`, 14, 37);
+
+ const alunosTabela = turma.alunos.map(a => [a.nome, a.saldo + ' moedas']);
+
+ doc.autoTable({
+  startY: 45,
+  head: [['Aluno', 'Saldo']],
+  body: alunosTabela,
+  theme: 'grid',
+  headStyles: { fillColor: [76,175,80] }
+ });
+
+ doc.save('relatorio_turma.pdf');
+}
+
+carregar();
+</script>
+
+</body>
+</html>
+
